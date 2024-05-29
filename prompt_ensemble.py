@@ -1,13 +1,10 @@
-import os
 from typing import Union, List
 from pkg_resources import packaging
 import torch
-import numpy as np
-from AnomalyCLIP_lib.simple_tokenizer import SimpleTokenizer as _Tokenizer
-# from open_clip import tokenizer
-# simple_tokenizer = tokenizer.SimpleTokenizer()
-from copy import deepcopy
 import torch.nn as nn
+from AnomalyCLIP_lib.simple_tokenizer import SimpleTokenizer as _Tokenizer
+from copy import deepcopy
+
 
 _tokenizer = _Tokenizer()
 
@@ -156,11 +153,11 @@ class AnomalyCLIP_PromptLearner(nn.Module):
             prompt_prefix_pos = " ".join(["X"] * n_ctx_pos)
             prompt_prefix_neg = " ".join(["X"] * n_ctx_neg)
         self.compound_prompts_depth = design_details["learnabel_text_embedding_depth"]
-        self.compound_prompts_text = nn.ParameterList([nn.Parameter(torch.empty(self.text_encoder_n_ctx, ctx_dim))
-                                                      for _ in range(self.compound_prompts_depth - 1)])
-        for single_para in self.compound_prompts_text:
-            print("single_para", single_para.shape)
-            nn.init.normal_(single_para, std=0.02)
+        self.compound_prompts_text = nn.Parameter(
+            torch.stack([torch.empty(self.text_encoder_n_ctx, ctx_dim)
+                 for _ in range(self.compound_prompts_depth - 1)]))
+        print("compound prompts text", self.compound_prompts_text.shape)
+        nn.init.normal_(self.compound_prompts_text, std=0.02)
 
         single_layer = nn.Linear(ctx_dim, 896)
         self.compound_prompt_projections = _get_clones(single_layer, self.compound_prompts_depth - 1)

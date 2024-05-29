@@ -236,14 +236,15 @@ class ResidualAttentionBlock_learnable_token(nn.Module):
             counter = inputs[2]
             if not self.first_layer:
                 # First check if the ith layer needs compound prompts or not
-                if not (counter > len(compound_prompts_deeper) - 1):
+                if counter < compound_prompts_deeper.shape[0]:
                     # Appending the learnable tokens in different way
                     # x -> [77, NCLS, DIM]
                     # First remove the learnable tokens from previous layer
                     prefix = x[:1, :, :]
                     suffix = x[1 + self.compound_prompt_nctx:, :, :]
                     textual_context = compound_prompts_deeper[counter]
-                    textual_context = textual_context.expand(x.shape[1], -1, -1).permute(1, 0, 2).half()
+                    #textual_context = textual_context.expand(x.shape[1], -1, -1).permute(1, 0, 2).half()
+                    textual_context = textual_context.expand(x.shape[1], -1, -1).permute(1, 0, 2)
                     # Add the learnable tokens of this layer with the input, replaced by previous
                     # layer learnable tokens
                     x = torch.cat([prefix, textual_context, suffix], dim=0)
@@ -384,13 +385,10 @@ class VisionTransformer(nn.Module):
                 patch_token_list.append(patch_token)
             patch_tokens = patch_token_list
 
-            return x_ori[0, :, :] @ self.proj, patch_tokens
-
+            return x_ori[0] @ self.proj, patch_tokens
 
         return x
 
-
-from thop import profile
 class AnomalyCLIP(nn.Module):
     def __init__(self,
                  embed_dim: int,
@@ -496,11 +494,6 @@ class AnomalyCLIP(nn.Module):
 
     def encode_text_learn(self, prompts, tokenized_prompts, deep_compound_prompts_text = None, normalize: bool = False):
         cast_dtype = self.transformer.get_cast_dtype()
-
-        # x = self.token_embedding(text).to(cast_dtype)  # [batch_size, n_ctx, d_model]
-        
-        # x = x + self.positional_embedding.to(cast_dtype)
-
         x = prompts + self.positional_embedding.to(cast_dtype)
         x = x.permute(1, 0, 2)  # NLD -> LND
         # print("test", x.shape, len(deep_compound_prompts_text))

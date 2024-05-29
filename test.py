@@ -1,19 +1,18 @@
 import AnomalyCLIP_lib
 import torch
 import argparse
-import torch.nn.functional as F
+import random
+import numpy as np
+
 from prompt_ensemble import AnomalyCLIP_PromptLearner
-from loss import FocalLoss, BinaryDiceLoss
-from utils import normalize
 from dataset import Dataset
 from logger import get_logger
 from tqdm import tqdm
-
-import os
-import random
-import numpy as np
 from tabulate import tabulate
 from utils import get_transform
+from metrics import image_level_metrics, pixel_level_metrics
+from tqdm import tqdm
+from scipy.ndimage import gaussian_filter
 
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -23,11 +22,7 @@ def setup_seed(seed):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-from visualization import visualizer
 
-from metrics import image_level_metrics, pixel_level_metrics
-from tqdm import tqdm
-from scipy.ndimage import gaussian_filter
 def test(args):
     img_size = args.image_size
     features_list = args.features_list
@@ -46,7 +41,9 @@ def test(args):
     preprocess, target_transform = get_transform(args)
     test_data = Dataset(root=args.data_path, transform=preprocess, target_transform=target_transform, dataset_name = args.dataset)
     test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=1, shuffle=False)
-    obj_list = test_data.obj_list
+    #obj_list = test_data.obj_list
+    obj_list = ['bottle']
+    print(obj_list)
 
 
     results = {}
@@ -65,6 +62,10 @@ def test(args):
 
     prompt_learner = AnomalyCLIP_PromptLearner(model.to("cpu"), AnomalyCLIP_parameters)
     checkpoint = torch.load(args.checkpoint_path)
+    checkpoint['prompt_learner']['compound_prompts_text'] = torch.stack([
+            checkpoint['prompt_learner'][f'compound_prompts_text.{i}'] for i in range(8)])
+    for i in range(8):
+        del checkpoint['prompt_learner'][f'compound_prompts_text.{i}']
     prompt_learner.load_state_dict(checkpoint["prompt_learner"])
     prompt_learner.to(device)
     model.to(device)
